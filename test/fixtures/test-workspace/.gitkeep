@@ -1,0 +1,2 @@
+# This file ensures the test-workspace directory is tracked by Git.
+# It is used as a workspace for integration tests.

@@ -100,9 +100,9 @@ describe('AuthService', () => {
                 viewer: Promise.resolve(mockViewer),
             } as unknown as LinearClient));
 
-            // Track event firing
+            // Track event firing via subscription
             const eventHandler = vi.fn();
-            authService.onDidChangeAuthentication(eventHandler);
+            const disposable = authService.onDidChangeAuthentication(eventHandler);
 
             // When authenticate() is called
             const result = await authService.authenticate();
@@ -117,6 +117,8 @@ describe('AuthService', () => {
             expect(authService.currentUser?.name).toBe('Jane');
             // And onDidChangeAuthentication should fire with true
             expect(eventHandler).toHaveBeenCalledWith(true);
+            
+            disposable.dispose();
         });
 
         it('should return false when user cancels input box', async () => {
@@ -189,7 +191,7 @@ describe('AuthService', () => {
             
             // Track event firing
             const eventHandler = vi.fn();
-            authService.onDidChangeAuthentication(eventHandler);
+            const disposable = authService.onDidChangeAuthentication(eventHandler);
 
             // When logout() is called
             await authService.logout();
@@ -204,6 +206,8 @@ describe('AuthService', () => {
             expect(eventHandler).toHaveBeenCalledWith(false);
             // And an info message should be shown
             expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Logged out from Linear');
+            
+            disposable.dispose();
         });
     });
 });

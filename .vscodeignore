@@ -1,20 +1,37 @@
-.vscode/**
-.vscode-test/**
+# Source files
 src/**
-test/**
 webview-ui/src/**
+webview-ui/*.ts
 webview-ui/node_modules/**
-.devcontainer/**
-.github/**
-.gitignore
-.eslintrc.json
-*.map
-*.ts
-!dist/**
-tsconfig.json
-esbuild.js
+
+# Test files
+test/**
+.vscode-test.js
 vitest.config.ts
 playwright.config.ts
-.vscode-test.js
+
+# Build artifacts not needed in package
+*.map
+coverage/**
+playwright-report/**
+
+# Development files
+.github/**
+.vscode/**
+*.md
+!README.md
+.gitignore
+.cursorignore
+.eslintrc*
+.prettierrc*
+tsconfig.json
+
+# Package management
 node_modules/**
-!node_modules/@linear/sdk/**
+pnpm-lock.yaml
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store

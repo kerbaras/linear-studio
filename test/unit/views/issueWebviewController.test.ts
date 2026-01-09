@@ -9,25 +9,28 @@ describe('IssueWebviewController', () => {
     let mockIssueService: {
         getIssueWithComments: ReturnType<typeof vi.fn>;
     };
+    let mockWebview: {
+        html: string;
+        options: Record<string, unknown>;
+        asWebviewUri: ReturnType<typeof vi.fn>;
+        postMessage: ReturnType<typeof vi.fn>;
+        onDidReceiveMessage: ReturnType<typeof vi.fn>;
+        cspSource: string;
+    };
     let mockPanel: {
-        webview: {
-            html: string;
-            options: Record<string, unknown>;
-            asWebviewUri: ReturnType<typeof vi.fn>;
-            postMessage: ReturnType<typeof vi.fn>;
-            onDidReceiveMessage: ReturnType<typeof vi.fn>;
-            cspSource: string;
-        };
+        webview: typeof mockWebview;
         reveal: ReturnType<typeof vi.fn>;
         dispose: ReturnType<typeof vi.fn>;
         onDidDispose: ReturnType<typeof vi.fn>;
         title: string;
+        iconPath?: unknown;
     };
     let mockExtensionUri: vscode.Uri;
     let mockIssue: IssueDTO;
     let mockIssueDetails: IssueDetailsDTO;
     let onDisposeCallback: ReturnType<typeof vi.fn>;
     let messageHandler: (message: { type: string; payload?: unknown }) => void;
+    let panelDisposeHandler: () => void;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -61,25 +64,27 @@ describe('IssueWebviewController', () => {
             getIssueWithComments: vi.fn().mockResolvedValue(mockIssueDetails),
         };
 
+        onDisposeCallback = vi.fn();
+
         // Capture message handler when onDidReceiveMessage is called
-        messageHandler = vi.fn();
+        mockWebview = {
+            html: '',
+            options: {},
+            asWebviewUri: vi.fn().mockImplementation((uri) => uri),
+            postMessage: vi.fn().mockResolvedValue(true),
+            onDidReceiveMessage: vi.fn().mockImplementation((handler) => {
+                messageHandler = handler;
+                return { dispose: vi.fn() };
+            }),
+            cspSource: 'vscode-webview://test',
+        };
 
         mockPanel = {
-            webview: {
-                html: '',
-                options: {},
-                asWebviewUri: vi.fn().mockImplementation((uri) => uri),
-                postMessage: vi.fn().mockResolvedValue(true),
-                onDidReceiveMessage: vi.fn().mockImplementation((handler) => {
-                    messageHandler = handler;
-                    return { dispose: vi.fn() };
-                }),
-                cspSource: 'vscode-webview://test',
-            },
+            webview: mockWebview,
             reveal: vi.fn(),
             dispose: vi.fn(),
             onDidDispose: vi.fn().mockImplementation((callback) => {
-                onDisposeCallback = callback;
+                panelDisposeHandler = callback;
                 return { dispose: vi.fn() };
             }),
             title: '',
@@ -90,10 +95,12 @@ describe('IssueWebviewController', () => {
         mockExtensionUri = { fsPath: '/extension' } as vscode.Uri;
         vi.mocked(vscode.Uri.joinPath).mockImplementation((...args) => ({ fsPath: args.join('/') } as vscode.Uri));
 
+        // Create controller - note the argument order: extensionUri, issueService, issue, onDisposeCallback
         controller = new IssueWebviewController(
             mockExtensionUri,
+            mockIssueService as unknown as IssueService,
             mockIssue,
-            mockIssueService as unknown as IssueService
+            onDisposeCallback
         );
     });
 
@@ -119,10 +126,12 @@ describe('IssueWebviewController', () => {
             };
 
             // When IssueWebviewController is instantiated
+            vi.mocked(vscode.window.createWebviewPanel).mockClear();
             new IssueWebviewController(
                 mockExtensionUri,
+                mockIssueService as unknown as IssueService,
                 longTitleIssue,
-                mockIssueService as unknown as IssueService
+                onDisposeCallback
             );
 
             // Then panel title should be truncated
@@ -136,9 +145,9 @@ describe('IssueWebviewController', () => {
     });
 
     describe('show', () => {
-        it('should call panel.reveal() when show is called', () => {
+        it('should call panel.reveal() when show is called', async () => {
             // When show() is called
-            controller.show();
+            await controller.show();
 
             // Then panel.reveal() should be called
             expect(mockPanel.reveal).toHaveBeenCalled();
@@ -154,11 +163,11 @@ describe('IssueWebviewController', () => {
             // Then IssueService.getIssueWithComments should be called
             expect(mockIssueService.getIssueWithComments).toHaveBeenCalledWith('issue-1');
             // And a "loading" message should be posted with { isLoading: true }
-            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+            expect(mockWebview.postMessage).toHaveBeenCalledWith(
                 expect.objectContaining({ type: 'loading', payload: { isLoading: true } })
             );
             // And an "update" message should be posted with the issue details
-            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+            expect(mockWebview.postMessage).toHaveBeenCalledWith(
                 expect.objectContaining({ type: 'update', payload: mockIssueDetails })
             );
         });
@@ -203,7 +212,7 @@ describe('IssueWebviewController', () => {
             await messageHandler({ type: 'ready' });
 
             // Then an "error" message should be posted
-            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+            expect(mockWebview.postMessage).toHaveBeenCalledWith(
                 expect.objectContaining({ 
                     type: 'error', 
                     payload: { message: 'Network error' } 
@@ -214,22 +223,18 @@ describe('IssueWebviewController', () => {
 
     describe('disposal', () => {
         it('should call onDisposeCallback when panel is closed', () => {
-            // Given an onDisposeCallback function
-            const disposeCallback = vi.fn();
-            controller.onDispose(disposeCallback);
-
             // When the panel is closed
-            onDisposeCallback();
+            panelDisposeHandler();
 
             // Then onDisposeCallback should be called
-            expect(disposeCallback).toHaveBeenCalled();
+            expect(onDisposeCallback).toHaveBeenCalled();
         });
     });
 
     describe('HTML content', () => {
         it('should include CSP with nonce and correct sources', () => {
             // The HTML is set during construction
-            const html = mockPanel.webview.html;
+            const html = mockWebview.html;
 
             // Then it should include Content-Security-Policy meta tag
             expect(html).toContain('Content-Security-Policy');

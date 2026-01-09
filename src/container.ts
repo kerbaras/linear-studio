@@ -17,6 +17,8 @@ export class Container {
     private static _issuesTreeProvider: IssuesTreeProvider;
     private static _issueWebviewManager: IssueWebviewManager;
     private static _gitService: GitService;
+    private static _autoRefreshTimer: ReturnType<typeof setInterval> | undefined;
+    private static _configChangeDisposable: vscode.Disposable | undefined;
     
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
         this._context = context;
@@ -61,6 +63,47 @@ export class Container {
                 isAuthenticated
             );
         });
+        
+        // Set up auto-refresh based on configuration
+        this.setupAutoRefresh();
+        
+        // Listen for configuration changes
+        this._configChangeDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
+            if (e.affectsConfiguration('linear-studio.autoRefreshInterval')) {
+                this.setupAutoRefresh();
+            }
+        });
+        context.subscriptions.push(this._configChangeDisposable);
+    }
+    
+    /**
+     * Sets up the auto-refresh timer based on the configured interval.
+     * If interval is 0, auto-refresh is disabled.
+     */
+    private static setupAutoRefresh(): void {
+        // Clear any existing timer
+        if (this._autoRefreshTimer) {
+            clearInterval(this._autoRefreshTimer);
+            this._autoRefreshTimer = undefined;
+        }
+        
+        // Get the configured interval (in seconds)
+        const config = vscode.workspace.getConfiguration('linear-studio');
+        const intervalSeconds = config.get<number>('autoRefreshInterval', 0);
+        
+        // If interval is 0 or negative, auto-refresh is disabled
+        if (intervalSeconds <= 0) {
+            return;
+        }
+        
+        // Set up the timer (convert seconds to milliseconds)
+        const intervalMs = intervalSeconds * 1000;
+        this._autoRefreshTimer = setInterval(() => {
+            // Only refresh if authenticated
+            if (this._authService?.isAuthenticated) {
+                this._issuesTreeProvider?.refresh(true);
+            }
+        }, intervalMs);
     }
     
     // Static getters for service access (like atlascode pattern)
@@ -74,6 +117,16 @@ export class Container {
     static get gitService(): GitService { return this._gitService; }
     
     static dispose(): void {
+        // Clear auto-refresh timer
+        if (this._autoRefreshTimer) {
+            clearInterval(this._autoRefreshTimer);
+            this._autoRefreshTimer = undefined;
+        }
+        
+        // Dispose config change listener
+        this._configChangeDisposable?.dispose();
+        
+        // Dispose webview manager
         this._issueWebviewManager?.dispose();
     }
 }
