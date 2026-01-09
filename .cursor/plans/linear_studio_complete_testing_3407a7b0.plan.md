@@ -4,31 +4,31 @@ overview: Complete the Linear Studio VS Code extension by implementing comprehen
 todos:
   - id: unit-auth-init-no-creds
     content: "AuthService: test initialize() with no stored credentials returns isAuthenticated=false"
-    status: in_progress
+    status: completed
   - id: unit-auth-init-valid
     content: "AuthService: test initialize() with valid stored key sets isAuthenticated=true and currentUser"
-    status: in_progress
+    status: completed
   - id: unit-auth-init-invalid
     content: "AuthService: test initialize() with invalid stored key deletes key and sets isAuthenticated=false"
-    status: in_progress
+    status: completed
   - id: unit-auth-authenticate-valid
     content: "AuthService: test authenticate() with valid key stores key, fires event, shows success message"
-    status: in_progress
+    status: completed
   - id: unit-auth-authenticate-invalid-format
     content: "AuthService: test authenticate() rejects keys not starting with lin_api_"
-    status: in_progress
+    status: completed
   - id: unit-auth-authenticate-cancel
     content: "AuthService: test authenticate() returns false when user cancels input box"
-    status: in_progress
+    status: completed
   - id: unit-auth-authenticate-api-error
     content: "AuthService: test authenticate() shows error message when Linear API rejects key"
-    status: in_progress
+    status: completed
   - id: unit-auth-logout
     content: "AuthService: test logout() deletes key, fires event, clears currentUser, shows message"
-    status: in_progress
+    status: completed
   - id: validate-auth-tests
     content: Run pnpm test:unit and verify all 8 AuthService tests pass
-    status: completed
+    status: in_progress
     dependencies:
       - unit-auth-init-no-creds
       - unit-auth-init-valid
@@ -52,7 +52,7 @@ todos:
     status: completed
   - id: validate-cred-tests
     content: Run pnpm test:unit and verify all 4 CredentialManager tests pass
-    status: completed
+    status: in_progress
     dependencies:
       - unit-cred-store
       - unit-cred-retrieve
@@ -78,7 +78,7 @@ todos:
     status: completed
   - id: validate-client-tests
     content: Run pnpm test:unit and verify all 6 LinearClientManager tests pass
-    status: completed
+    status: in_progress
     dependencies:
       - unit-client-get-authenticated
       - unit-client-get-cached
@@ -136,7 +136,7 @@ todos:
     status: completed
   - id: validate-issue-tests
     content: Run pnpm test:unit and verify all 16 IssueService tests pass
-    status: completed
+    status: in_progress
     dependencies:
       - unit-issue-fetch-no-filter
       - unit-issue-fetch-cycle-filter
@@ -186,7 +186,7 @@ todos:
     status: completed
   - id: validate-git-tests
     content: Run pnpm test:unit and verify all 10 GitService tests pass
-    status: completed
+    status: in_progress
     dependencies:
       - unit-git-get-single-repo
       - unit-git-get-no-repo
@@ -248,7 +248,7 @@ todos:
     status: completed
   - id: validate-tree-tests
     content: Run pnpm test:unit and verify all 16 TreeProvider tests pass
-    status: completed
+    status: in_progress
     dependencies:
       - unit-tree-group-by-cycle
       - unit-tree-cycle-sort
@@ -280,7 +280,7 @@ todos:
     status: completed
   - id: validate-startwork-tests
     content: Run pnpm test:unit and verify all 4 StartWork tests pass
-    status: completed
+    status: in_progress
     dependencies:
       - unit-startwork-create-branch
       - unit-startwork-create-copy
@@ -318,7 +318,7 @@ todos:
     status: completed
   - id: validate-webview-ctrl-tests
     content: Run pnpm test:unit and verify all 10 WebviewController tests pass
-    status: completed
+    status: in_progress
     dependencies:
       - unit-webview-ctrl-panel-config
       - unit-webview-ctrl-title-truncate
@@ -347,7 +347,7 @@ todos:
     status: completed
   - id: validate-webview-mgr-tests
     content: Run pnpm test:unit and verify all 5 WebviewManager tests pass
-    status: completed
+    status: in_progress
     dependencies:
       - unit-webview-mgr-new-issue
       - unit-webview-mgr-reuse

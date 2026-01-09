@@ -4,69 +4,52 @@ import * as vscode from 'vscode';
 
 describe('GitService', () => {
     let gitService: GitService;
-    let mockGitExtension: {
-        isActive: boolean;
-        exports: {
-            getAPI: ReturnType<typeof vi.fn>;
-        };
-        activate: ReturnType<typeof vi.fn>;
-    };
-    let mockGitApi: {
-        repositories: Array<{
-            rootUri: { fsPath: string };
-            state: {
-                HEAD: { name: string } | undefined;
-                refs: Array<{ name: string; type: number }>;
-                remotes: Array<{ name: string }>;
-            };
-            checkout: ReturnType<typeof vi.fn>;
-            createBranch: ReturnType<typeof vi.fn>;
-        }>;
-    };
+    let mockGitExtension: any;
+    let mockRepository: any;
 
     beforeEach(() => {
         vi.clearAllMocks();
-
-        mockGitApi = {
-            repositories: [],
-        };
-
-        mockGitExtension = {
-            isActive: true,
-            exports: {
-                getAPI: vi.fn().mockReturnValue(mockGitApi),
+        
+        mockRepository = {
+            rootUri: { fsPath: '/Users/dev/project' },
+            state: {
+                HEAD: { name: 'main' },
+                refs: [],
+                remotes: [],
             },
-            activate: vi.fn().mockResolvedValue({
-                getAPI: vi.fn().mockReturnValue(mockGitApi),
-            }),
+            checkout: vi.fn(),
+            createBranch: vi.fn(),
         };
-
-        vi.mocked(vscode.extensions.getExtension).mockReturnValue(mockGitExtension as unknown as vscode.Extension<unknown>);
-
+        
+        mockGitExtension = {
+            exports: {
+                getAPI: vi.fn().mockReturnValue({
+                    repositories: [mockRepository],
+                }),
+            },
+            isActive: true,
+        };
+        
+        vi.mocked(vscode.extensions.getExtension).mockReturnValue(mockGitExtension);
+        
         gitService = new GitService();
     });
 
     describe('getRepository', () => {
         it('should return repository when single repo exists', async () => {
             // Given 1 Git repository is open
-            const mockRepo = {
-                rootUri: { fsPath: '/Users/dev/project' },
-                state: { HEAD: { name: 'main' }, refs: [], remotes: [] },
-                checkout: vi.fn(),
-                createBranch: vi.fn(),
-            };
-            mockGitApi.repositories = [mockRepo];
+            mockGitExtension.exports.getAPI().repositories = [mockRepository];
 
             // When getRepository is called
             const result = await gitService.getRepository();
 
             // Then it should return that repository
-            expect(result).toBe(mockRepo);
+            expect(result).toBe(mockRepository);
         });
 
         it('should return undefined when no repos exist', async () => {
             // Given 0 Git repositories are open
-            mockGitApi.repositories = [];
+            mockGitExtension.exports.getAPI().repositories = [];
 
             // When getRepository is called
             const result = await gitService.getRepository();
@@ -75,21 +58,21 @@ describe('GitService', () => {
             expect(result).toBeUndefined();
         });
 
-        it('should return repository containing active file when multiple repos', async () => {
+        it('should return repository for active file when multiple repos', async () => {
             // Given 3 Git repositories are open
             const repos = [
-                { rootUri: { fsPath: '/Users/dev/project-a' }, state: { HEAD: undefined, refs: [], remotes: [] } },
-                { rootUri: { fsPath: '/Users/dev/project-b' }, state: { HEAD: undefined, refs: [], remotes: [] } },
-                { rootUri: { fsPath: '/Users/dev/project-c' }, state: { HEAD: undefined, refs: [], remotes: [] } },
+                { rootUri: { fsPath: '/Users/dev/project-a' }, state: { HEAD: { name: 'main' }, refs: [] } },
+                { rootUri: { fsPath: '/Users/dev/project-b' }, state: { HEAD: { name: 'main' }, refs: [] } },
+                { rootUri: { fsPath: '/Users/dev/project-c' }, state: { HEAD: { name: 'main' }, refs: [] } },
             ];
-            mockGitApi.repositories = repos as typeof mockGitApi.repositories;
-
+            mockGitExtension.exports.getAPI().repositories = repos;
+            
             // And the active file is at "/Users/dev/project-b/src/index.ts"
             vi.mocked(vscode.window).activeTextEditor = {
                 document: {
                     uri: { fsPath: '/Users/dev/project-b/src/index.ts' },
                 },
-            } as unknown as vscode.TextEditor;
+            } as any;
 
             // When getRepository is called
             const result = await gitService.getRepository();
@@ -101,11 +84,11 @@ describe('GitService', () => {
         it('should return first repository when multiple repos and no active file', async () => {
             // Given 2 Git repositories are open
             const repos = [
-                { rootUri: { fsPath: '/Users/dev/project-a' }, state: { HEAD: undefined, refs: [], remotes: [] } },
-                { rootUri: { fsPath: '/Users/dev/project-b' }, state: { HEAD: undefined, refs: [], remotes: [] } },
+                { rootUri: { fsPath: '/Users/dev/project-a' }, state: { HEAD: { name: 'main' }, refs: [] } },
+                { rootUri: { fsPath: '/Users/dev/project-b' }, state: { HEAD: { name: 'main' }, refs: [] } },
             ];
-            mockGitApi.repositories = repos as typeof mockGitApi.repositories;
-
+            mockGitExtension.exports.getAPI().repositories = repos;
+            
             // And no file is open in the editor
             vi.mocked(vscode.window).activeTextEditor = undefined;
 
@@ -113,18 +96,16 @@ describe('GitService', () => {
             const result = await gitService.getRepository();
 
             // Then it should return the first repository
-            expect(result?.rootUri.fsPath).toBe('/Users/dev/project-a');
+            expect(result).toBe(repos[0]);
         });
 
-        it('should return undefined when git extension is not installed', async () => {
+        it('should return undefined when Git extension not available', async () => {
             // Given the vscode.git extension is not installed
             vi.mocked(vscode.extensions.getExtension).mockReturnValue(undefined);
-            
-            // Create a fresh GitService to clear cached API
-            const freshGitService = new GitService();
+            gitService = new GitService(); // Reset to clear cached API
 
             // When getRepository is called
-            const result = await freshGitService.getRepository();
+            const result = await gitService.getRepository();
 
             // Then it should return undefined
             expect(result).toBeUndefined();
@@ -132,25 +113,15 @@ describe('GitService', () => {
     });
 
     describe('createBranch', () => {
-        it('should create new branch and show success message', async () => {
+        it('should create new branch successfully', async () => {
             // Given no branch named "user/eng-123-fix-bug" exists
-            const mockRepo = {
-                rootUri: { fsPath: '/Users/dev/project' },
-                state: {
-                    HEAD: { name: 'main' },
-                    refs: [], // No existing branches
-                    remotes: [],
-                },
-                checkout: vi.fn(),
-                createBranch: vi.fn(),
-            };
-            mockGitApi.repositories = [mockRepo];
+            mockRepository.state.refs = [];
 
             // When createBranch("user/eng-123-fix-bug") is called
             const result = await gitService.createBranch('user/eng-123-fix-bug');
 
             // Then repo.createBranch should be called with ("user/eng-123-fix-bug", true)
-            expect(mockRepo.createBranch).toHaveBeenCalledWith('user/eng-123-fix-bug', true);
+            expect(mockRepository.createBranch).toHaveBeenCalledWith('user/eng-123-fix-bug', true);
             // And it should return true
             expect(result).toBe(true);
             // And an info message should be shown
@@ -161,27 +132,17 @@ describe('GitService', () => {
 
         it('should checkout existing local branch', async () => {
             // Given a local branch "user/eng-123-fix-bug" already exists
-            const mockRepo = {
-                rootUri: { fsPath: '/Users/dev/project' },
-                state: {
-                    HEAD: { name: 'main' },
-                    refs: [
-                        { name: 'user/eng-123-fix-bug', type: 0 }, // RefType.Head = 0
-                    ],
-                    remotes: [],
-                },
-                checkout: vi.fn(),
-                createBranch: vi.fn(),
-            };
-            mockGitApi.repositories = [mockRepo];
+            mockRepository.state.refs = [
+                { name: 'user/eng-123-fix-bug', type: 0 }, // RefType.Head = 0
+            ];
 
             // When createBranch("user/eng-123-fix-bug") is called
             const result = await gitService.createBranch('user/eng-123-fix-bug');
 
             // Then repo.checkout should be called with "user/eng-123-fix-bug"
-            expect(mockRepo.checkout).toHaveBeenCalledWith('user/eng-123-fix-bug');
+            expect(mockRepository.checkout).toHaveBeenCalledWith('user/eng-123-fix-bug');
             // And repo.createBranch should NOT be called
-            expect(mockRepo.createBranch).not.toHaveBeenCalled();
+            expect(mockRepository.createBranch).not.toHaveBeenCalled();
             // And it should return true
             expect(result).toBe(true);
             // And an info message should be shown
@@ -191,26 +152,17 @@ describe('GitService', () => {
         });
 
         it('should checkout existing remote branch', async () => {
-            // Given no local branch exists but remote branch exists
-            const mockRepo = {
-                rootUri: { fsPath: '/Users/dev/project' },
-                state: {
-                    HEAD: { name: 'main' },
-                    refs: [
-                        { name: 'origin/user/eng-123-fix-bug', type: 1 }, // RefType.RemoteHead = 1
-                    ],
-                    remotes: [{ name: 'origin' }],
-                },
-                checkout: vi.fn(),
-                createBranch: vi.fn(),
-            };
-            mockGitApi.repositories = [mockRepo];
+            // Given no local branch "user/eng-123-fix-bug" exists
+            // And a remote branch "origin/user/eng-123-fix-bug" exists
+            mockRepository.state.refs = [
+                { name: 'origin/user/eng-123-fix-bug', type: 1 }, // RefType.RemoteHead = 1
+            ];
 
             // When createBranch("user/eng-123-fix-bug") is called
             const result = await gitService.createBranch('user/eng-123-fix-bug');
 
             // Then repo.checkout should be called with "user/eng-123-fix-bug"
-            expect(mockRepo.checkout).toHaveBeenCalledWith('user/eng-123-fix-bug');
+            expect(mockRepository.checkout).toHaveBeenCalledWith('user/eng-123-fix-bug');
             // And it should return true
             expect(result).toBe(true);
             // And an info message should be shown
@@ -220,18 +172,9 @@ describe('GitService', () => {
         });
 
         it('should return false and show error on Git failure', async () => {
-            // Given Git throws error
-            const mockRepo = {
-                rootUri: { fsPath: '/Users/dev/project' },
-                state: {
-                    HEAD: { name: 'main' },
-                    refs: [],
-                    remotes: [],
-                },
-                checkout: vi.fn(),
-                createBranch: vi.fn().mockRejectedValue(new Error('Branch name contains invalid characters')),
-            };
-            mockGitApi.repositories = [mockRepo];
+            // Given Git throws error "Branch name contains invalid characters"
+            mockRepository.createBranch.mockRejectedValue(new Error('Branch name contains invalid characters'));
+            mockRepository.state.refs = [];
 
             // When createBranch("invalid//branch") is called
             const result = await gitService.createBranch('invalid//branch');
@@ -244,9 +187,9 @@ describe('GitService', () => {
             );
         });
 
-        it('should show error when no repository exists', async () => {
+        it('should return false and show error when no repository', async () => {
             // Given no Git repository is open
-            mockGitApi.repositories = [];
+            mockGitExtension.exports.getAPI().repositories = [];
 
             // When createBranch("user/eng-123") is called
             const result = await gitService.createBranch('user/eng-123');
@@ -263,17 +206,7 @@ describe('GitService', () => {
     describe('getCurrentBranch', () => {
         it('should return current branch name', async () => {
             // Given the current branch is "main"
-            const mockRepo = {
-                rootUri: { fsPath: '/Users/dev/project' },
-                state: {
-                    HEAD: { name: 'main' },
-                    refs: [],
-                    remotes: [],
-                },
-                checkout: vi.fn(),
-                createBranch: vi.fn(),
-            };
-            mockGitApi.repositories = [mockRepo];
+            mockRepository.state.HEAD = { name: 'main' };
 
             // When getCurrentBranch is called
             const result = await gitService.getCurrentBranch();
@@ -284,17 +217,7 @@ describe('GitService', () => {
 
         it('should return undefined when detached HEAD', async () => {
             // Given the repository is in detached HEAD state
-            const mockRepo = {
-                rootUri: { fsPath: '/Users/dev/project' },
-                state: {
-                    HEAD: undefined,
-                    refs: [],
-                    remotes: [],
-                },
-                checkout: vi.fn(),
-                createBranch: vi.fn(),
-            };
-            mockGitApi.repositories = [mockRepo];
+            mockRepository.state.HEAD = { name: undefined };
 
             // When getCurrentBranch is called
             const result = await gitService.getCurrentBranch();

@@ -2,17 +2,27 @@ import { vi } from 'vitest';
 
 // Mock VS Code API (not available in unit tests)
 vi.mock('vscode', () => {
-    const mockEventEmitter = () => {
-        const listeners: Function[] = [];
-        return {
-            event: (listener: Function) => {
-                listeners.push(listener);
-                return { dispose: () => {} };
-            },
-            fire: (data: unknown) => listeners.forEach(l => l(data)),
-            dispose: vi.fn(),
+    // EventEmitter class that properly mimics VS Code's EventEmitter
+    class MockEventEmitter<T = any> {
+        private listeners: ((data: T) => void)[] = [];
+        
+        // The event property is a function that registers listeners
+        event = (listener: (data: T) => void) => {
+            this.listeners.push(listener);
+            return { dispose: () => {
+                const idx = this.listeners.indexOf(listener);
+                if (idx >= 0) this.listeners.splice(idx, 1);
+            }};
         };
-    };
+        
+        fire(data: T) {
+            this.listeners.forEach(l => l(data));
+        }
+        
+        dispose() {
+            this.listeners = [];
+        }
+    }
 
     return {
         window: {
@@ -54,7 +64,7 @@ vi.mock('vscode', () => {
             executeCommand: vi.fn(),
             getCommands: vi.fn().mockResolvedValue([]),
         },
-        EventEmitter: vi.fn().mockImplementation(mockEventEmitter),
+        EventEmitter: MockEventEmitter,
         ThemeIcon: class ThemeIcon {
             constructor(public id: string, public color?: unknown) {}
         },

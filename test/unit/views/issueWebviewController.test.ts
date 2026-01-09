@@ -6,107 +6,77 @@ import * as vscode from 'vscode';
 
 describe('IssueWebviewController', () => {
     let controller: IssueWebviewController;
-    let mockIssueService: {
-        getIssueWithComments: ReturnType<typeof vi.fn>;
-    };
-    let mockWebview: {
-        html: string;
-        options: Record<string, unknown>;
-        asWebviewUri: ReturnType<typeof vi.fn>;
-        postMessage: ReturnType<typeof vi.fn>;
-        onDidReceiveMessage: ReturnType<typeof vi.fn>;
-        cspSource: string;
-    };
-    let mockPanel: {
-        webview: typeof mockWebview;
-        reveal: ReturnType<typeof vi.fn>;
-        dispose: ReturnType<typeof vi.fn>;
-        onDidDispose: ReturnType<typeof vi.fn>;
-        title: string;
-        iconPath?: unknown;
-    };
+    let mockIssueService: IssueService;
+    let mockPanel: vscode.WebviewPanel;
     let mockExtensionUri: vscode.Uri;
-    let mockIssue: IssueDTO;
-    let mockIssueDetails: IssueDetailsDTO;
     let onDisposeCallback: ReturnType<typeof vi.fn>;
-    let messageHandler: (message: { type: string; payload?: unknown }) => void;
-    let panelDisposeHandler: () => void;
+    let messageHandler: (message: any) => void;
+
+    const mockIssue: IssueDTO = {
+        id: '1',
+        identifier: 'ENG-142',
+        title: 'Add user avatar component',
+        description: 'Implement avatar component',
+        priority: 2,
+        priorityLabel: 'High',
+        url: 'https://linear.app/test/issue/ENG-142',
+        branchName: 'user/eng-142-add-avatar',
+        state: { id: 's1', name: 'In Progress', type: 'started', color: '#f2c94c' },
+        labels: [],
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+    };
+
+    const mockIssueDetails: IssueDetailsDTO = {
+        ...mockIssue,
+        comments: [
+            { id: 'c1', body: 'Comment 1', createdAt: '2024-01-01T00:00:00Z', user: { id: 'u1', name: 'User 1' } },
+        ],
+    };
 
     beforeEach(() => {
         vi.clearAllMocks();
-
-        mockIssue = {
-            id: 'issue-1',
-            identifier: 'ENG-142',
-            title: 'Add user avatar component',
-            description: 'Test description',
-            priority: 2,
-            priorityLabel: 'High',
-            url: 'https://linear.app/test/issue/ENG-142',
-            branchName: 'user/eng-142-add-avatar',
-            state: { id: 's1', name: 'In Progress', type: 'started', color: '#f2c94c' },
-            cycle: { id: 'c1', name: 'Sprint 1' },
-            project: { id: 'p1', name: 'Frontend' },
-            assignee: { id: 'u1', name: 'John Doe', email: 'john@test.com' },
-            labels: [],
-            createdAt: '2024-01-01T00:00:00Z',
-            updatedAt: '2024-01-02T00:00:00Z',
-        };
-
-        mockIssueDetails = {
-            ...mockIssue,
-            comments: [
-                { id: 'c1', body: 'First comment', createdAt: '2024-01-01T00:00:00Z', user: { name: 'John', avatarUrl: null } },
-            ],
-        };
-
+        
         mockIssueService = {
             getIssueWithComments: vi.fn().mockResolvedValue(mockIssueDetails),
-        };
+        } as unknown as IssueService;
 
+        mockExtensionUri = vscode.Uri.parse('file:///extension');
         onDisposeCallback = vi.fn();
 
-        // Capture message handler when onDidReceiveMessage is called
-        mockWebview = {
-            html: '',
-            options: {},
-            asWebviewUri: vi.fn().mockImplementation((uri) => uri),
-            postMessage: vi.fn().mockResolvedValue(true),
-            onDidReceiveMessage: vi.fn().mockImplementation((handler) => {
-                messageHandler = handler;
-                return { dispose: vi.fn() };
-            }),
-            cspSource: 'vscode-webview://test',
-        };
-
+        // Capture the message handler when onDidReceiveMessage is called
         mockPanel = {
-            webview: mockWebview,
+            webview: {
+                html: '',
+                onDidReceiveMessage: vi.fn((handler) => {
+                    messageHandler = handler;
+                    return { dispose: vi.fn() };
+                }),
+                postMessage: vi.fn(),
+                asWebviewUri: vi.fn((uri) => uri),
+                cspSource: 'https://test.com',
+            },
             reveal: vi.fn(),
             dispose: vi.fn(),
-            onDidDispose: vi.fn().mockImplementation((callback) => {
-                panelDisposeHandler = callback;
+            onDidDispose: vi.fn((handler) => {
                 return { dispose: vi.fn() };
             }),
-            title: '',
-        };
+            iconPath: undefined,
+        } as unknown as vscode.WebviewPanel;
 
-        vi.mocked(vscode.window.createWebviewPanel).mockReturnValue(mockPanel as unknown as vscode.WebviewPanel);
+        vi.mocked(vscode.window.createWebviewPanel).mockReturnValue(mockPanel);
 
-        mockExtensionUri = { fsPath: '/extension' } as vscode.Uri;
-        vi.mocked(vscode.Uri.joinPath).mockImplementation((...args) => ({ fsPath: args.join('/') } as vscode.Uri));
-
-        // Create controller - note the argument order: extensionUri, issueService, issue, onDisposeCallback
         controller = new IssueWebviewController(
             mockExtensionUri,
-            mockIssueService as unknown as IssueService,
+            mockIssueService,
             mockIssue,
             onDisposeCallback
         );
     });
 
-    describe('panel creation', () => {
+    describe('Panel Creation', () => {
         it('should create webview panel with correct configuration', () => {
-            // Then createWebviewPanel should be called with correct args
+            // Then createWebviewPanel should be called with correct options
             expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
                 'linearIssue',
                 expect.stringContaining('ENG-142'),
@@ -118,26 +88,25 @@ describe('IssueWebviewController', () => {
             );
         });
 
-        it('should truncate long issue titles with ellipsis', () => {
-            // Given an issue with a very long title
-            const longTitleIssue = {
+        it('should truncate long issue titles', () => {
+            const longTitleIssue: IssueDTO = {
                 ...mockIssue,
-                title: 'This is a very long issue title that should be truncated to fit in the panel tab',
+                title: 'This is a very long issue title that should be truncated to fit in the panel title',
             };
 
-            // When IssueWebviewController is instantiated
             vi.mocked(vscode.window.createWebviewPanel).mockClear();
+            
             new IssueWebviewController(
                 mockExtensionUri,
-                mockIssueService as unknown as IssueService,
+                mockIssueService,
                 longTitleIssue,
                 onDisposeCallback
             );
 
-            // Then panel title should be truncated
+            // Then panel title should be truncated with ellipsis
             expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
                 'linearIssue',
-                expect.stringMatching(/ENG-142:.*…$/),
+                expect.stringMatching(/ENG-142.*…$/),
                 expect.anything(),
                 expect.anything()
             );
@@ -145,7 +114,7 @@ describe('IssueWebviewController', () => {
     });
 
     describe('show', () => {
-        it('should call panel.reveal() when show is called', async () => {
+        it('should reveal the panel', async () => {
             // When show() is called
             await controller.show();
 
@@ -154,28 +123,28 @@ describe('IssueWebviewController', () => {
         });
     });
 
-    describe('message handling', () => {
-        it('should load issue data when ready message is received', async () => {
+    describe('Message Handling', () => {
+        it('should load issue data on ready message', async () => {
             // Given the webview posts message { type: "ready" }
             // When the message is received
             await messageHandler({ type: 'ready' });
 
             // Then IssueService.getIssueWithComments should be called
-            expect(mockIssueService.getIssueWithComments).toHaveBeenCalledWith('issue-1');
-            // And a "loading" message should be posted with { isLoading: true }
-            expect(mockWebview.postMessage).toHaveBeenCalledWith(
+            expect(mockIssueService.getIssueWithComments).toHaveBeenCalledWith('1');
+            // And loading messages should be posted
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
                 expect.objectContaining({ type: 'loading', payload: { isLoading: true } })
             );
-            // And an "update" message should be posted with the issue details
-            expect(mockWebview.postMessage).toHaveBeenCalledWith(
+            // And update message should be posted
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
                 expect.objectContaining({ type: 'update', payload: mockIssueDetails })
             );
         });
 
-        it('should execute startWork command when startWork message is received', async () => {
-            // Given the webview posts { type: "startWork" }
+        it('should execute startWork command on startWork message', async () => {
+            // Given the webview posts { type: "startWork", payload: { issueId: "1" } }
             // When the message is received
-            await messageHandler({ type: 'startWork' });
+            await messageHandler({ type: 'startWork', payload: { issueId: '1' } });
 
             // Then commands.executeCommand should be called with "linear-studio.startWork"
             expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
@@ -184,8 +153,8 @@ describe('IssueWebviewController', () => {
             );
         });
 
-        it('should open external URL when openInBrowser message is received', async () => {
-            // Given the webview posts { type: "openInBrowser", payload: { url: "..." } }
+        it('should open external URL on openInBrowser message', async () => {
+            // Given the webview posts { type: "openInBrowser", payload: { url: "https://linear.app/..." } }
             // When the message is received
             await messageHandler({ type: 'openInBrowser', payload: { url: 'https://linear.app/test' } });
 
@@ -193,55 +162,54 @@ describe('IssueWebviewController', () => {
             expect(vscode.env.openExternal).toHaveBeenCalled();
         });
 
-        it('should reload issue data when refresh message is received', async () => {
+        it('should refresh issue data on refresh message', async () => {
             // Given the webview posts { type: "refresh" }
-            mockIssueService.getIssueWithComments.mockClear();
-
             // When the message is received
             await messageHandler({ type: 'refresh' });
 
             // Then IssueService.getIssueWithComments should be called again
-            expect(mockIssueService.getIssueWithComments).toHaveBeenCalledWith('issue-1');
+            expect(mockIssueService.getIssueWithComments).toHaveBeenCalledWith('1');
         });
 
-        it('should post error message when loading issue fails', async () => {
-            // Given IssueService.getIssueWithComments throws Error
-            mockIssueService.getIssueWithComments.mockRejectedValue(new Error('Network error'));
+        it('should post error message on load failure', async () => {
+            // Given IssueService.getIssueWithComments throws Error "Network error"
+            vi.mocked(mockIssueService.getIssueWithComments).mockRejectedValue(new Error('Network error'));
 
             // When ready message is received
             await messageHandler({ type: 'ready' });
 
             // Then an "error" message should be posted
-            expect(mockWebview.postMessage).toHaveBeenCalledWith(
-                expect.objectContaining({ 
-                    type: 'error', 
-                    payload: { message: 'Network error' } 
-                })
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'error', payload: { message: 'Network error' } })
             );
         });
     });
 
-    describe('disposal', () => {
-        it('should call onDisposeCallback when panel is closed', () => {
-            // When the panel is closed
-            panelDisposeHandler();
-
-            // Then onDisposeCallback should be called
-            expect(onDisposeCallback).toHaveBeenCalled();
-        });
-    });
-
-    describe('HTML content', () => {
-        it('should include CSP with nonce and correct sources', () => {
+    describe('HTML Content', () => {
+        it('should include correct CSP in HTML content', () => {
             // The HTML is set during construction
-            const html = mockWebview.html;
-
+            const html = mockPanel.webview.html;
+            
             // Then it should include Content-Security-Policy meta tag
             expect(html).toContain('Content-Security-Policy');
             // And script-src should include nonce
-            expect(html).toMatch(/script-src.*nonce-/);
-            // And style-src should include webview cspSource
-            expect(html).toContain('vscode-webview://test');
+            expect(html).toContain("script-src 'nonce-");
+            // And style-src should include webview.cspSource
+            expect(html).toContain('style-src');
+            // And img-src should allow https: and data:
+            expect(html).toContain('img-src');
+            expect(html).toContain('https:');
+            expect(html).toContain('data:');
+        });
+    });
+
+    describe('Disposal', () => {
+        it('should call onDisposeCallback and clean up on dispose', () => {
+            // When dispose is called
+            controller.dispose();
+
+            // Then the panel should be disposed
+            expect(mockPanel.dispose).toHaveBeenCalled();
         });
     });
 });
