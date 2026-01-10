@@ -190,7 +190,7 @@
     "build:extension": "node esbuild.js --production",
     "build:webview": "cd webview-ui && pnpm run build",
     "watch": "node esbuild.js --watch",
-    "watch:webview": "cd webview-ui && pnpm run dev",
+    "watch:webview": "cd webview-ui && pnpm run watch",
     "lint": "eslint src --ext ts",
     "lint:fix": "eslint src --ext ts --fix",
     "typecheck": "tsc --noEmit",
