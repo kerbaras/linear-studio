@@ -13,6 +13,14 @@ Linear Studio is a VS Code extension that integrates with Linear issue tracker. 
 - Playwright (E2E testing)
 - pnpm (package manager)
 
+## Related Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture, design patterns, component interactions |
+| [TESTING.md](./TESTING.md) | Testing infrastructure, conventions, and test scenarios |
+| [DEVELOPMENT.md](./DEVELOPMENT.md) | Development workflows, common tasks, debugging tips |
+
 ## Directory Structure
 
 ```
