@@ -98,7 +98,7 @@ export class IssuesTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     }
     
     private formatDateRange(start?: string, end?: string): string | undefined {
-        if (!start || !end) return undefined;
+        if (!start || !end) {return undefined;}
         const startDate = new Date(start);
         const endDate = new Date(end);
         const fmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });

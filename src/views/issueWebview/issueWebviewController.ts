@@ -4,27 +4,12 @@ import { IssueDTO, IssueDetailsDTO } from '../../linear/types';
 
 // ─── Message Types for IPC ─────────────────────────────────────────
 
-interface WebviewMessage {
-    type: string;
-    payload?: unknown;
-}
+type ExtensionToWebviewMessage =
+    | { type: 'update'; payload: IssueDetailsDTO }
+    | { type: 'loading'; payload: { isLoading: boolean } }
+    | { type: 'error'; payload: { message: string } };
 
-interface UpdateMessage extends WebviewMessage {
-    type: 'update';
-    payload: IssueDetailsDTO;
-}
-
-interface LoadingMessage extends WebviewMessage {
-    type: 'loading';
-    payload: { isLoading: boolean };
-}
-
-interface ErrorMessage extends WebviewMessage {
-    type: 'error';
-    payload: { message: string };
-}
-
-type ActionMessage = 
+type ActionMessage =
     | { type: 'startWork'; payload: { issueId: string } }
     | { type: 'openInBrowser'; payload: { url: string } }
     | { type: 'refresh' }
@@ -35,7 +20,8 @@ type ActionMessage =
 export class IssueWebviewController implements vscode.Disposable {
     private _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
-    
+    private _disposed = false;
+
     constructor(
         private readonly extensionUri: vscode.Uri,
         private readonly issueService: IssueService,
@@ -114,7 +100,7 @@ export class IssueWebviewController implements vscode.Disposable {
         }
     }
     
-    private postMessage(message: WebviewMessage): void {
+    private postMessage(message: ExtensionToWebviewMessage): void {
         this._panel.webview.postMessage(message);
     }
     
@@ -166,6 +152,11 @@ export class IssueWebviewController implements vscode.Disposable {
     }
     
     dispose(): void {
+        if (this._disposed) {
+            return;
+        }
+        this._disposed = true;
+
         this._panel.dispose();
         for (const d of this._disposables) {
             d.dispose();
