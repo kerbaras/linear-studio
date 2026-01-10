@@ -13,11 +13,21 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other", "SCM Providers"],
-  "keywords": ["linear", "issue tracker", "project management", "git"],
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "linear",
+    "issue tracker",
+    "project management",
+    "git"
+  ],
   "activationEvents": [],
   "main": "./dist/extension.js",
-  "extensionDependencies": ["vscode.git"],
+  "extensionDependencies": [
+    "vscode.git"
+  ],
   "contributes": {
     "commands": [
       {
@@ -71,6 +81,18 @@
         "command": "linear-studio.openInBrowser",
         "title": "Open in Browser",
         "icon": "$(link-external)"
+      },
+      {
+        "command": "linear-studio.updateStatus",
+        "title": "Update Status",
+        "icon": "$(circle-filled)",
+        "category": "Linear"
+      },
+      {
+        "command": "linear-studio.searchIssues",
+        "title": "Search Issues",
+        "icon": "$(search)",
+        "category": "Linear"
       }
     ],
     "viewsContainers": {
@@ -123,6 +145,11 @@
           "command": "linear-studio.clearFilters",
           "when": "view == linearStudio.issues",
           "group": "1_filter"
+        },
+        {
+          "command": "linear-studio.searchIssues",
+          "when": "view == linearStudio.issues",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -150,6 +177,11 @@
           "command": "linear-studio.openInBrowser",
           "when": "view == linearStudio.issues && viewItem =~ /^issue:/",
           "group": "2_clipboard@2"
+        },
+        {
+          "command": "linear-studio.updateStatus",
+          "when": "view == linearStudio.issues && viewItem =~ /^issue:/",
+          "group": "1_actions@3"
         }
       ],
       "commandPalette": [
@@ -163,6 +195,14 @@
         },
         {
           "command": "linear-studio.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "linear-studio.updateStatus",
+          "when": "false"
+        },
+        {
+          "command": "linear-studio.startWork",
           "when": "false"
         }
       ]
@@ -191,7 +231,7 @@
     "build:extension": "node esbuild.js --production",
     "build:webview": "cd webview-ui && pnpm run build",
     "watch": "node esbuild.js --watch",
-    "watch:webview": "cd webview-ui && pnpm run dev",
+    "watch:webview": "cd webview-ui && pnpm run watch",
     "lint": "eslint src --ext ts",
     "lint:fix": "eslint src --ext ts --fix",
     "typecheck": "tsc --noEmit",
@@ -218,6 +258,7 @@
     "eslint": "^8.50.0",
     "glob": "^10.3.0",
     "mocha": "^10.2.0",
+    "sharp": "^0.34.5",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"
   },

@@ -7,7 +7,7 @@ export class GitService {
     private _gitApi: GitAPI | undefined;
     
     private async getGitApi(): Promise<GitAPI | undefined> {
-        if (this._gitApi) return this._gitApi;
+        if (this._gitApi) {return this._gitApi;}
         
         const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');
         if (!gitExtension) {
@@ -28,7 +28,7 @@ export class GitService {
     
     async getRepository(): Promise<Repository | undefined> {
         const git = await this.getGitApi();
-        if (!git) return undefined;
+        if (!git) {return undefined;}
         
         // Use the first repository, or let user pick if multiple
         if (git.repositories.length === 0) {

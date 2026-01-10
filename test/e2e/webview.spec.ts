@@ -24,21 +24,29 @@ async function setupMockVSCodeApi(page: Page) {
 }
 
 async function sendMockIssueData(page: Page, issueData: unknown) {
+    // Wait for React to render first
+    await page.waitForSelector('#root', { state: 'attached' });
     await page.evaluate((data) => {
         window.postMessage({ type: 'update', payload: data }, '*');
     }, issueData);
+    // Wait for the data to be processed
+    await page.waitForTimeout(100);
 }
 
 async function sendLoadingState(page: Page, isLoading: boolean) {
+    await page.waitForSelector('#root', { state: 'attached' });
     await page.evaluate((loading) => {
         window.postMessage({ type: 'loading', payload: { isLoading: loading } }, '*');
     }, isLoading);
+    await page.waitForTimeout(100);
 }
 
 async function sendErrorState(page: Page, message: string) {
+    await page.waitForSelector('#root', { state: 'attached' });
     await page.evaluate((msg) => {
         window.postMessage({ type: 'error', payload: { message: msg } }, '*');
     }, message);
+    await page.waitForTimeout(100);
 }
 
 async function getSentMessages(page: Page): Promise<unknown[]> {
@@ -51,6 +59,8 @@ test.describe('Issue Webview Rendering', () => {
     test.beforeEach(async ({ page }) => {
         await setupMockVSCodeApi(page);
         await page.goto('/');
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForSelector('#root', { state: 'attached' });
     });
 
     test('issue header displays title, identifier, and status badge', async ({ page }) => {
@@ -120,7 +130,10 @@ test.describe('Webview Button Actions', () => {
     test.beforeEach(async ({ page }) => {
         await setupMockVSCodeApi(page);
         await page.goto('/');
+        await page.waitForLoadState('domcontentloaded');
         await sendMockIssueData(page, mockIssueDetails);
+        // Wait for issue data to render
+        await page.waitForSelector('[data-testid="issue-title"]', { timeout: 10000 });
     });
 
     test('Start Working button sends postMessage', async ({ page }) => {
@@ -144,10 +157,13 @@ test.describe('Webview Button Actions', () => {
     });
 
     test('Refresh button sends postMessage', async ({ page }) => {
-        // Click Refresh button
+        // Wait for loading to complete (button becomes enabled)
         const refreshBtn = page.locator('button:has-text("Refresh"), [data-testid="refresh-btn"]');
+        await expect(refreshBtn).toBeEnabled({ timeout: 10000 });
+
+        // Click Refresh button
         await refreshBtn.click();
-        
+
         // Check that postMessage was sent
         const messages = await getSentMessages(page);
         expect(messages.some((m: unknown) => (m as Record<string, unknown>).type === 'refresh')).toBe(true);
@@ -158,6 +174,8 @@ test.describe('Webview Loading States', () => {
     test.beforeEach(async ({ page }) => {
         await setupMockVSCodeApi(page);
         await page.goto('/');
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForSelector('#root', { state: 'attached' });
     });
 
     test('loading state displays spinner', async ({ page }) => {

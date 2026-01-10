@@ -404,7 +404,7 @@ describe('IssueService', () => {
                 { id: 'p1', name: 'Frontend' },
                 { id: 'p2', name: 'Backend' },
             ];
-            
+
             const mockClient = await mockClientManager.getClient();
             vi.mocked(mockClient.projects).mockResolvedValue({ nodes: mockProjects } as any);
 
@@ -415,6 +415,124 @@ describe('IssueService', () => {
             expect(result).toHaveLength(2);
             expect(result[0]).toEqual({ id: 'p1', name: 'Frontend' });
             expect(result[1]).toEqual({ id: 'p2', name: 'Backend' });
+        });
+    });
+
+    describe('getWorkflowStates', () => {
+        it('should return workflow states for an issue\'s team', async () => {
+            // Given an issue with a team that has workflow states
+            const mockStates = [
+                { id: 's1', name: 'Backlog', type: 'backlog', color: '#888888' },
+                { id: 's2', name: 'In Progress', type: 'started', color: '#f2c94c' },
+                { id: 's3', name: 'Done', type: 'completed', color: '#27ae60' },
+            ];
+
+            const mockIssue = {
+                id: 'issue-1',
+                team: Promise.resolve({
+                    id: 'team-1',
+                    states: vi.fn().mockResolvedValue({ nodes: mockStates }),
+                }),
+            };
+
+            const mockClient = await mockClientManager.getClient();
+            vi.mocked(mockClient.issue).mockResolvedValue(mockIssue as any);
+
+            // When getWorkflowStates is called
+            const result = await issueService.getWorkflowStates('issue-1');
+
+            // Then it should return 3 workflow states
+            expect(result).toHaveLength(3);
+            expect(result[0]).toEqual({ id: 's1', name: 'Backlog', type: 'backlog', color: '#888888' });
+            expect(result[1]).toEqual({ id: 's2', name: 'In Progress', type: 'started', color: '#f2c94c' });
+            expect(result[2]).toEqual({ id: 's3', name: 'Done', type: 'completed', color: '#27ae60' });
+        });
+
+        it('should return empty array when issue has no team', async () => {
+            // Given an issue without a team
+            const mockIssue = {
+                id: 'issue-1',
+                team: Promise.resolve(null),
+            };
+
+            const mockClient = await mockClientManager.getClient();
+            vi.mocked(mockClient.issue).mockResolvedValue(mockIssue as any);
+
+            // When getWorkflowStates is called
+            const result = await issueService.getWorkflowStates('issue-1');
+
+            // Then it should return empty array
+            expect(result).toEqual([]);
+        });
+    });
+
+    describe('updateIssueStatus', () => {
+        it('should update issue status and return updated DTO', async () => {
+            // Given an issue and a new state
+            const mockUpdatedIssue = createMockIssue({
+                id: 'issue-1',
+                state: Promise.resolve({
+                    id: 's2',
+                    name: 'Done',
+                    type: 'completed',
+                    color: '#27ae60',
+                }),
+            });
+
+            const mockPayload = {
+                success: true,
+                issue: Promise.resolve(mockUpdatedIssue),
+            };
+
+            const mockClient = await mockClientManager.getClient();
+            (mockClient as any).updateIssue = vi.fn().mockResolvedValue(mockPayload);
+
+            // When updateIssueStatus is called
+            const result = await issueService.updateIssueStatus('issue-1', 's2');
+
+            // Then it should call updateIssue with correct params
+            expect(mockClient.updateIssue).toHaveBeenCalledWith('issue-1', { stateId: 's2' });
+
+            // And return the updated IssueDTO
+            expect(result.id).toBe('issue-1');
+            expect(result.state?.id).toBe('s2');
+            expect(result.state?.name).toBe('Done');
+        });
+
+        it('should throw error when update fails', async () => {
+            // Given updateIssue returns failure
+            const mockPayload = { success: false, issue: null };
+
+            const mockClient = await mockClientManager.getClient();
+            (mockClient as any).updateIssue = vi.fn().mockResolvedValue(mockPayload);
+
+            // When updateIssueStatus is called
+            // Then it should throw an error
+            await expect(issueService.updateIssueStatus('issue-1', 's2'))
+                .rejects.toThrow('Failed to update issue status');
+        });
+
+        it('should clear cache after update', async () => {
+            // Given issues are cached
+            mockAssignedIssues.mockResolvedValue({
+                nodes: [createMockIssue()],
+                pageInfo: { hasNextPage: false },
+            });
+            await issueService.getMyAssignedIssues();
+            mockAssignedIssues.mockClear();
+
+            // And updateIssue succeeds
+            const mockUpdatedIssue = createMockIssue({ id: 'issue-1' });
+            const mockPayload = { success: true, issue: Promise.resolve(mockUpdatedIssue) };
+            const mockClient = await mockClientManager.getClient();
+            (mockClient as any).updateIssue = vi.fn().mockResolvedValue(mockPayload);
+
+            // When updateIssueStatus is called
+            await issueService.updateIssueStatus('issue-1', 's2');
+
+            // Then cache should be cleared
+            await issueService.getMyAssignedIssues();
+            expect(mockAssignedIssues).toHaveBeenCalled();
         });
     });
 });

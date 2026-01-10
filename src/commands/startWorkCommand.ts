@@ -14,7 +14,7 @@ export async function startWorkOnIssue(issue: IssueDTO): Promise<void> {
         'Create Branch & Copy'
     );
     
-    if (!action) return;
+    if (!action) {return;}
     
     // Create the branch
     const success = await Container.gitService.createBranch(branchName);

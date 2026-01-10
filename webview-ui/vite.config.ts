@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
   build: {
     outDir: 'dist',
@@ -19,7 +19,8 @@ export default defineConfig({
     cssCodeSplit: false,
     sourcemap: false,
   },
-  define: {
+  // Only define NODE_ENV for production builds
+  define: command === 'build' ? {
     'process.env.NODE_ENV': JSON.stringify('production'),
-  },
-});
+  } : {},
+}));

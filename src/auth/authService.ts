@@ -60,7 +60,7 @@ export class AuthService {
             }
         });
         
-        if (!apiKey) return false;
+        if (!apiKey) {return false;}
         
         // Validate the API key by making a test request
         try {

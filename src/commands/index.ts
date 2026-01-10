@@ -48,7 +48,112 @@ export function registerCommands(context: vscode.ExtensionContext): void {
             Container.issuesTree.refresh(true); // Clear cache on manual refresh
         })
     );
-    
+
+    disposables.push(
+        vscode.commands.registerCommand(Commands.UpdateStatus, async (issue: IssueDTO) => {
+            try {
+                // Fetch available workflow states
+                const states = await Container.issueService.getWorkflowStates(issue.id);
+
+                if (states.length === 0) {
+                    vscode.window.showErrorMessage('No workflow states found for this issue.');
+                    return;
+                }
+
+                // Show quick pick with states
+                const items = states.map(s => ({
+                    label: `$(circle-filled) ${s.name}`,
+                    description: s.type,
+                    id: s.id,
+                    picked: issue.state?.id === s.id,
+                }));
+
+                const selected = await vscode.window.showQuickPick(items, {
+                    placeHolder: `Current status: ${issue.state?.name || 'Unknown'}`,
+                    title: 'Update Issue Status',
+                });
+
+                if (!selected) {
+                    return;
+                }
+
+                // Update the status
+                await vscode.window.withProgress(
+                    {
+                        location: vscode.ProgressLocation.Notification,
+                        title: 'Updating issue status...',
+                        cancellable: false,
+                    },
+                    async () => {
+                        await Container.issueService.updateIssueStatus(issue.id, selected.id);
+                    }
+                );
+
+                vscode.window.showInformationMessage(
+                    `Updated ${issue.identifier} status to "${selected.label.replace('$(circle-filled) ', '')}"`
+                );
+
+                // Refresh the tree view
+                Container.issuesTree.refresh(true);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Failed to update status: ${message}`);
+            }
+        })
+    );
+
+    disposables.push(
+        vscode.commands.registerCommand(Commands.SearchIssues, async () => {
+            try {
+                const query = await vscode.window.showInputBox({
+                    prompt: 'Search issues by title or identifier',
+                    placeHolder: 'e.g., "login bug" or "ENG-123"',
+                });
+
+                if (!query) {
+                    return;
+                }
+
+                // Get all assigned issues and filter by search query
+                const allIssues = await Container.issueService.getMyAssignedIssues();
+                const queryLower = query.toLowerCase();
+
+                const matchingIssues = allIssues.filter(
+                    i =>
+                        i.title.toLowerCase().includes(queryLower) ||
+                        i.identifier.toLowerCase().includes(queryLower) ||
+                        i.description?.toLowerCase().includes(queryLower)
+                );
+
+                if (matchingIssues.length === 0) {
+                    vscode.window.showInformationMessage(`No issues found matching "${query}"`);
+                    return;
+                }
+
+                // Show quick pick with matching issues
+                const items = matchingIssues.map(i => ({
+                    label: `$(issues) ${i.identifier}`,
+                    description: i.title,
+                    detail: i.state?.name,
+                    issue: i,
+                }));
+
+                const selected = await vscode.window.showQuickPick(items, {
+                    placeHolder: `Found ${matchingIssues.length} issue(s)`,
+                    matchOnDescription: true,
+                    matchOnDetail: true,
+                });
+
+                if (selected) {
+                    await Container.issueWebviewManager.showIssue(selected.issue);
+                }
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Search failed: ${message}`);
+            }
+        })
+    );
+
     // ─── Filter Commands ───────────────────────────────────────────
     
     disposables.push(

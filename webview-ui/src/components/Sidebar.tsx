@@ -15,7 +15,7 @@ export function Sidebar({ issue }: SidebarProps) {
   const updatedDate = formatRelativeTime(issue.updatedAt);
 
   return (
-    <div className="sidebar-content">
+    <div className="sidebar-content" data-testid="sidebar">
       <SidebarItem label="Status">
         <StatusDisplay state={issue.state} />
       </SidebarItem>
