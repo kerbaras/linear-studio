@@ -116,6 +116,52 @@ export class IssueService {
     clearCache(): void {
         this._issueCache.clear();
     }
+
+    /**
+     * Get workflow states for an issue's team
+     */
+    async getWorkflowStates(issueId: string): Promise<Array<{ id: string; name: string; type: string; color: string }>> {
+        const client = await this.clientManager.getClient();
+        const issue = await client.issue(issueId);
+        const team = await issue.team;
+
+        if (!team) {
+            return [];
+        }
+
+        const statesConnection = await team.states();
+        return statesConnection.nodes.map(s => ({
+            id: s.id,
+            name: s.name,
+            type: s.type,
+            color: s.color,
+        }));
+    }
+
+    /**
+     * Update the status of an issue
+     */
+    async updateIssueStatus(issueId: string, stateId: string): Promise<IssueDTO> {
+        const client = await this.clientManager.getClient();
+
+        // Update the issue status
+        const payload = await client.updateIssue(issueId, { stateId });
+
+        if (!payload.success) {
+            throw new Error('Failed to update issue status');
+        }
+
+        // Fetch the updated issue
+        const issue = await payload.issue;
+        if (!issue) {
+            throw new Error('Issue not found after update');
+        }
+
+        // Clear cache since data changed
+        this.clearCache();
+
+        return this.toIssueDTO(issue);
+    }
     
     // ─── DTO Converters ────────────────────────────────────────────
     

@@ -6,8 +6,10 @@ export const Commands = {
     // Issue actions
     ViewIssue: 'linear-studio.viewIssue',
     StartWork: 'linear-studio.startWork',
+    UpdateStatus: 'linear-studio.updateStatus',
     CopyIssueLink: 'linear-studio.copyIssueLink',
     OpenInBrowser: 'linear-studio.openInBrowser',
+    SearchIssues: 'linear-studio.searchIssues',
     
     // Tree view actions
     RefreshIssues: 'linear-studio.refreshIssues',
